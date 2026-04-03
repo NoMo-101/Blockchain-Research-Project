@@ -1,105 +1,198 @@
 # Blockchain-Research-Project
-
-📡 SDR Signal Log (Smart Contract)
+# 📡 SDR Signal Log (Smart Contract)
 
 A lightweight Solidity smart contract for logging Software Defined Radio (SDR) signal readings on-chain.
 
 This contract allows external scripts, oracles, or devices to submit signal data such as frequency, signal strength (RSSI), and detection status in a verifiable and immutable way.
 
-🚀 Overview
+---
 
-The SDRSignalLog contract stores radio signal readings submitted by users (typically automated scripts or hardware systems). Each reading is permanently recorded on the blockchain and can be retrieved later.
+## 🚀 Overview
 
-This is useful for:
+`SDRSignalLog` stores radio signal readings submitted by users (typically automated scripts or SDR hardware systems). Each reading is permanently recorded on-chain and can be retrieved at any time.
 
-Signal monitoring systems
-Research and experimentation with SDR data
-Verifiable logging of radio activity
-Combining on-chain records with off-chain datasets
-📦 Data Structure
+### 💡 Use Cases
+- SDR signal monitoring systems  
+- Blockchain-based research logging  
+- Verifiable radio activity tracking  
+- Linking on-chain logs with off-chain datasets  
 
-Each signal reading includes:
+---
 
-reporter → Address that submitted the reading
-freqHz → Frequency in Hz
-rssi → Signal strength (range: -150 to 0)
-detected → Whether a signal was detected
-time → Block timestamp
-metaHash → Optional hash of off-chain data (e.g., IQ files, JSON, logs)
-⚙️ Functions
-submitReading(...)
+## 📦 Data Structure
 
-Submits a new signal reading to the blockchain.
+Each reading contains:
 
-Parameters:
+| Field       | Type     | Description |
+|------------|----------|-------------|
+| reporter   | address  | Address that submitted the reading |
+| freqHz     | uint256  | Frequency in Hz |
+| rssi       | int256   | Signal strength (-150 to 0) |
+| detected   | bool     | Signal detected or not |
+| time       | uint256  | Block timestamp |
+| metaHash   | bytes32  | Hash of off-chain data |
 
-freqHz (uint256): Frequency in Hz (must be > 0 and ≤ 300 GHz)
-rssi (int256): Signal strength (must be between -150 and 0)
-detected (bool): Signal presence
-metaHash (bytes32): Optional hash of off-chain metadata
+---
 
-Returns:
+## ⚙️ Functions
 
-id (uint256): ID of the newly stored reading
-totalReadings()
+### `submitReading(uint256 freqHz, int256 rssi, bool detected, bytes32 metaHash)`
+
+Submits a new SDR reading.
+
+**Requirements:**
+- `freqHz` must be > 0 and ≤ 300,000,000,000 (300 GHz)
+- `rssi` must be between -150 and 0
+
+**Returns:**
+- `uint256 id` → ID of the new reading
+
+---
+
+### `totalReadings()`
 
 Returns the total number of readings stored.
 
-getReading(id)
+---
 
-Fetches a specific reading by ID.
+### `getReading(uint256 id)`
 
-Requirements:
+Retrieves a reading by ID.
 
-ID must exist (bounds checked)
-🔒 Input Validation
+**Requirements:**
+- `id` must be within range
 
-The contract enforces:
+---
 
-Frequency must be within realistic SDR bounds (0 < freq ≤ 300 GHz)
-RSSI must be within valid signal strength range (-150 to 0)
-📡 Events
-ReadingSubmitted
+## 🔒 Input Validation
 
-Emitted whenever a new reading is added.
+The contract ensures:
+- Valid frequency range (SDR realistic bounds)
+- Valid RSSI values (signal strength limits)
+
+---
+
+## 📡 Events
+
+### `ReadingSubmitted`
+
+Emitted when a new reading is logged.
 
 Includes:
+- `id`
+- `reporter`
+- `freqHz`
+- `rssi`
+- `detected`
+- `metaHash`
+- `time`
 
-Reading ID
-Reporter address
-Frequency
-RSSI
-Detection status
-Metadata hash
-Timestamp
-🧠 How It Works
-A script or SDR system detects a signal
-It calls submitReading() with the data
-The contract validates and stores the reading
-The reading is permanently recorded and can be retrieved anytime
-🔗 Off-Chain Data (metaHash)
+---
 
-The metaHash field allows you to link additional data stored off-chain, such as:
+## 🧠 How It Works
 
-IQ recordings
-Detailed signal analysis
-JSON metadata
-Files stored on IPFS or other storage systems
-🛠️ Example Use Case
-An SDR device scans frequencies continuously
-When a signal is detected, it logs:
-Frequency
-Signal strength
-Detection status
-Extra data is saved off-chain and hashed
-The hash is stored on-chain for verification
-📄 License
+1. SDR system detects a signal  
+2. Script/oracle calls `submitReading()`  
+3. Contract validates input  
+4. Reading is stored on-chain  
+5. Event is emitted  
+
+---
+
+## 🔗 Off-Chain Data (metaHash)
+
+The `metaHash` field links to external data such as:
+- IQ recordings  
+- JSON metadata  
+- Signal analysis files  
+- IPFS / decentralized storage  
+
+---
+
+## 🛠️ Example Workflow
+
+```text
+SDR Device → Script → Smart Contract → Blockchain Storage
+                         ↓
+                  Off-chain storage (IPFS, etc.)
+```
+
+---
+
+## 📁 Contract
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract SDRSignalLog {
+    struct Reading {
+        address reporter;
+        uint256 freqHz;
+        int256 rssi;
+        bool detected;
+        uint256 time;
+        bytes32 metaHash;
+    }
+
+    Reading[] public readings;
+
+    event ReadingSubmitted(
+        uint256 indexed id,
+        address indexed reporter,
+        uint256 freqHz,
+        int256 rssi,
+        bool detected,
+        bytes32 metaHash,
+        uint256 time
+    );
+
+    function submitReading(
+        uint256 freqHz,
+        int256 rssi,
+        bool detected,
+        bytes32 metaHash
+    ) external returns (uint256 id) {
+
+        require(freqHz > 0 && freqHz <= 300_000_000_000, "Invalid frequency");
+        require(rssi >= -150 && rssi <= 0, "RSSI out of range");
+
+        id = readings.length;
+        readings.push(Reading({
+            reporter: msg.sender,
+            freqHz: freqHz,
+            rssi: rssi,
+            detected: detected,
+            time: block.timestamp,
+            metaHash: metaHash
+        }));
+
+        emit ReadingSubmitted(id, msg.sender, freqHz, rssi, detected, metaHash, block.timestamp);
+    }
+
+    function totalReadings() external view returns (uint256) {
+        return readings.length;
+    }
+
+    function getReading(uint256 id) external view returns (Reading memory) {
+        require(id < readings.length, "ID out of range");
+        return readings[id];
+    }
+}
+```
+
+---
+
+## 🚀 Future Improvements
+
+- Filtering/search functionality  
+- Batch submission of readings  
+- Chainlink oracle integration  
+- Access control (role-based submissions)  
+- Frontend dashboard (data visualization)  
+
+---
+
+## 📄 License
 
 MIT License
-
-✨ Future Improvements (Optional Ideas)
-Add filtering/search functions
-Support batching multiple readings
-Integrate with Chainlink oracles
-Add access control (if needed)
-Frontend dashboard for visualization
